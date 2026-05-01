@@ -11,12 +11,12 @@ import re
 from dataclasses import dataclass
 
 try:
-    from duckduckgo_search import DDGS
+    from ddgs import DDGS
 except ImportError:
-    print("Instalando duckduckgo-search...")
+    print("Instalando ddgs...")
     import subprocess
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "duckduckgo-search", "-q"])
-    from duckduckgo_search import DDGS
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "ddgs", "-q"])
+    from ddgs import DDGS
 
 try:
     import instaloader
