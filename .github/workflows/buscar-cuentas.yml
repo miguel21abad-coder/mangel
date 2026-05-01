@@ -36,13 +36,16 @@ jobs:
             --pais "$PAIS" \
             --cantidad $CANTIDAD \
             --modo $MODO \
-            --token "$APIFY_TOKEN" > search-results.txt 2>&1
+            --token "$APIFY_TOKEN" > search-results.txt 2>&1 || true
+          echo "--- EXIT ---" >> search-results.txt
           cat search-results.txt
 
       - name: Commit results
+        if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin claude/add-find-skills-OlSXP
           git add search-results.txt
           git diff --staged --quiet || git commit -m "Search results [skip ci]"
           git push
