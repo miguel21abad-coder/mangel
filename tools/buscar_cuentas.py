@@ -25,6 +25,15 @@ except ImportError:
 
 APIFY_BASE = "https://api.apify.com/v2"
 
+# Hashtags por nicho que atraen cuentas grandes
+HASHTAGS_NICHO = {
+    "bodybuilding": ["ifbbpro", "classicphysique", "bodybuildingmotivation", "naturalbodybuilding", "mensphysique"],
+    "fitness": ["fitnessmotivation", "personaltrainer", "fitnesscoach", "workout", "gymlife"],
+    "culturismo": ["culturismofemenino", "culturismonatural", "fitness", "gymmotivation", "musculacion"],
+    "yoga": ["yogainstructor", "yogateacher", "yogaeveryday", "yogalife", "yogapractice"],
+    "crossfit": ["crossfitathlete", "crossfitlife", "wod", "functionalfitness", "crossfitgames"],
+}
+
 
 @dataclass
 class CuentaInstagram:
@@ -42,41 +51,50 @@ class CuentaInstagram:
 def apify_run(actor: str, run_input: dict, token: str, timeout: int = 120) -> list:
     """Lanza un actor de Apify y devuelve los resultados del dataset."""
     url = f"{APIFY_BASE}/acts/{actor}/run-sync-get-dataset-items"
-    params = {"token": token, "timeout": timeout, "memory": 256}
+    params = {"token": token, "timeout": timeout, "memory": 512}
     resp = requests.post(url, params=params, json=run_input, timeout=timeout + 30)
     resp.raise_for_status()
     return resp.json()
 
 
 def buscar_usernames_apify(nicho: str, pais: str, cantidad: int, token: str) -> list[str]:
-    """Busca cuentas por keyword usando Apify Instagram Search Scraper (searchType=user)."""
+    """Busca usuarios por hashtags de nicho usando Apify Instagram Hashtag Scraper."""
     solo_ingles = pais.lower() in ("en", "english", "inglés", "ingles")
     print(f"\n🔍 Buscando cuentas de '{nicho}' {'en inglés (global)' if solo_ingles else 'en ' + pais}...")
 
-    keywords = [nicho]
-    if " " in nicho:
-        keywords.append(nicho.replace(" ", ""))
+    # Hashtags principales del nicho
+    nicho_key = nicho.lower().replace(" ", "")
+    hashtags = [nicho_key] + HASHTAGS_NICHO.get(nicho.lower(), [])
+    if not HASHTAGS_NICHO.get(nicho.lower()):
+        # Fallback genérico
+        hashtags += [f"{nicho_key}motivation", f"{nicho_key}life", f"{nicho_key}coach"]
+
+    print(f"  Hashtags: {', '.join(['#'+h for h in hashtags[:5]])}...")
 
     run_input = {
-        "keywords": keywords,
-        "searchType": "user",
-        "resultsPerKeyword": cantidad * 5,
+        "hashtags": hashtags,
+        "resultsLimit": 500,  # Más posts = más cuentas grandes encontradas
+        "scrapeType": "posts",
     }
 
     try:
-        items = apify_run("apify~instagram-search-scraper", run_input, token, timeout=120)
+        items = apify_run("apify~instagram-hashtag-scraper", run_input, token, timeout=300)
     except Exception as e:
-        print(f"  ⚠️  Error en búsqueda: {e}")
+        print(f"  ⚠️  Error buscando hashtags: {e}")
         return []
 
-    usernames = []
-    seen = set()
+    # Contar menciones por usuario (los que aparecen más veces = más activos en el nicho)
+    conteo: dict[str, int] = {}
     for item in items:
-        u = item.get("username") or item.get("ownerUsername")
-        if u and u not in seen:
-            seen.add(u)
-            usernames.append(u)
+        u = item.get("ownerUsername") or item.get("username")
+        if u:
+            conteo[u] = conteo.get(u, 0) + 1
 
+    # Ordenar por actividad en el nicho
+    ordenados = sorted(conteo.items(), key=lambda x: x[1], reverse=True)
+    usernames = [u for u, _ in ordenados]
+
+    print(f"  → {len(usernames)} usuarios únicos encontrados en {len(items)} posts")
     return usernames
 
 
@@ -151,10 +169,10 @@ PALABRAS_ES = {
 def es_ingles(texto: str) -> bool:
     palabras = re.findall(r"[a-záéíóúüñ]+", texto.lower())
     if not palabras:
-        return False
+        return True  # Sin texto = no descartamos
     hits_en = sum(1 for p in palabras if p in PALABRAS_EN)
     hits_es = sum(1 for p in palabras if p in PALABRAS_ES)
-    return hits_en > hits_es
+    return hits_en >= hits_es  # En caso de empate, consideramos inglés
 
 
 def fmt(n: float) -> str:
@@ -189,8 +207,6 @@ def main():
     if not usernames:
         print("❌ No se encontraron cuentas para ese nicho.")
         sys.exit(1)
-
-    print(f"  → {len(usernames)} usuarios encontrados")
 
     print(f"\n📊 Obteniendo métricas de perfiles...")
     cuentas = []
