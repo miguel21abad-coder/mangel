@@ -25,7 +25,7 @@ except ImportError:
     import requests
 
 
-APAFY_BASE = "https://api.apify.com/v2"
+APIFY_BASE = "https://api.apify.com/v2"
 
 
 @dataclass
@@ -187,7 +187,6 @@ def main():
 
     solo_ingles = args.pais.lower() in ("en", "english", "inglés", "ingles")
 
-    # Paso 1: encontrar usernames por hashtag
     usernames = buscar_usernames_apify(args.nicho, args.pais, args.cantidad, args.token)
     if not usernames:
         print("❌ No se encontraron cuentas para ese nicho.")
@@ -195,7 +194,6 @@ def main():
 
     print(f"  → {len(usernames)} usuarios encontrados en posts del hashtag")
 
-    # Paso 2: obtener métricas de perfiles en lotes de 20
     print(f"\n📊 Obteniendo métricas de perfiles...")
     cuentas = []
     batch_size = 20
@@ -224,7 +222,6 @@ def main():
         print("❌ Ninguna cuenta superó los 100K seguidores con los filtros aplicados.")
         sys.exit(1)
 
-    # Ordenar
     if args.modo == "viral":
         cuentas.sort(key=lambda c: c.ratio_views, reverse=True)
         criterio = "ratio views/seguidores"
