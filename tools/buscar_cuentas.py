@@ -180,7 +180,7 @@ def main():
         if analizadas >= args.cantidad:
             break
         cuenta = obtener_metricas(username, loader)
-        if cuenta and cuenta.seguidores > 500:
+        if cuenta and cuenta.seguidores >= 100_000:
             cuentas.append(cuenta)
             analizadas += 1
             viral = f" | ratio views: {cuenta.ratio_views}x" if cuenta.reels_analizados > 0 else ""
