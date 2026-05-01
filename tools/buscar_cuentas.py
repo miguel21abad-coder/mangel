@@ -12,9 +12,7 @@ Obtén tu token gratis (sin tarjeta) en: https://apify.com
 
 import argparse
 import sys
-import time
 import re
-import json
 from dataclasses import dataclass
 
 try:
@@ -51,30 +49,30 @@ def apify_run(actor: str, run_input: dict, token: str, timeout: int = 120) -> li
 
 
 def buscar_usernames_apify(nicho: str, pais: str, cantidad: int, token: str) -> list[str]:
-    """Busca usuarios por hashtag usando Apify Instagram Hashtag Scraper."""
+    """Busca cuentas por keyword usando Apify Instagram Search Scraper (searchType=user)."""
     solo_ingles = pais.lower() in ("en", "english", "inglés", "ingles")
     print(f"\n🔍 Buscando cuentas de '{nicho}' {'en inglés (global)' if solo_ingles else 'en ' + pais}...")
 
-    hashtags = [nicho.replace(" ", ""), nicho.replace(" ", "_")]
-    if solo_ingles:
-        hashtags += ["bodybuilding", "bodybuildingmotivation", "naturalbodybuilding"]
+    keywords = [nicho]
+    if " " in nicho:
+        keywords.append(nicho.replace(" ", ""))
 
     run_input = {
-        "hashtags": hashtags,
-        "resultsLimit": cantidad * 8,
-        "scrapeType": "posts",
+        "keywords": keywords,
+        "searchType": "user",
+        "resultsPerKeyword": cantidad * 5,
     }
 
     try:
-        items = apify_run("apify~instagram-hashtag-scraper", run_input, token, timeout=180)
+        items = apify_run("apify~instagram-search-scraper", run_input, token, timeout=120)
     except Exception as e:
-        print(f"  ⚠️  Error buscando hashtags: {e}")
+        print(f"  ⚠️  Error en búsqueda: {e}")
         return []
 
     usernames = []
     seen = set()
     for item in items:
-        u = item.get("ownerUsername") or item.get("username")
+        u = item.get("username") or item.get("ownerUsername")
         if u and u not in seen:
             seen.add(u)
             usernames.append(u)
@@ -192,7 +190,7 @@ def main():
         print("❌ No se encontraron cuentas para ese nicho.")
         sys.exit(1)
 
-    print(f"  → {len(usernames)} usuarios encontrados en posts del hashtag")
+    print(f"  → {len(usernames)} usuarios encontrados")
 
     print(f"\n📊 Obteniendo métricas de perfiles...")
     cuentas = []
@@ -210,10 +208,9 @@ def main():
             cuenta = procesar_perfil(data)
             if not cuenta:
                 continue
-            if solo_ingles:
-                if not es_ingles(cuenta.bio):
-                    print(f"  ⏭  @{cuenta.username} descartada (no publica en inglés)")
-                    continue
+            if solo_ingles and not es_ingles(cuenta.bio):
+                print(f"  ⏭  @{cuenta.username} descartada (no en inglés)")
+                continue
             cuentas.append(cuenta)
             views_str = f" | views avg: {fmt(cuenta.media_views)} (ratio {cuenta.ratio_views}x)" if cuenta.reels_analizados > 0 else ""
             print(f"  ✓ @{cuenta.username} — {fmt(cuenta.seguidores)} seguidores — {cuenta.engagement}% eng{views_str}")
