@@ -27,6 +27,35 @@ except ImportError:
     subprocess.check_call([sys.executable, "-m", "pip", "install", "instaloader", "-q"])
     import instaloader
 
+try:
+    from langdetect import detect as detect_lang
+except ImportError:
+    import subprocess
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "langdetect", "-q"])
+    from langdetect import detect as detect_lang
+
+
+def es_ingles(profile: "instaloader.Profile") -> bool:
+    """Detecta si el perfil publica en inglés usando bio + captions recientes."""
+    textos = [profile.biography or ""]
+    try:
+        for i, post in enumerate(profile.get_posts()):
+            if i >= 5:
+                break
+            if post.caption:
+                textos.append(post.caption[:200])
+            time.sleep(0.2)
+    except Exception:
+        pass
+
+    texto_total = " ".join(textos).strip()
+    if not texto_total:
+        return False
+    try:
+        return detect_lang(texto_total) == "en"
+    except Exception:
+        return False
+
 
 @dataclass
 class CuentaInstagram:
@@ -44,14 +73,24 @@ class CuentaInstagram:
 
 def buscar_usernames(nicho: str, pais: str, cantidad: int) -> list[str]:
     """Encuentra usernames de Instagram buscando en la web."""
-    print(f"\n🔍 Buscando cuentas de '{nicho}' en {pais}...")
+    idioma = "English" if pais == "_en" else pais
+    print(f"\n🔍 Buscando cuentas de '{nicho}' ({idioma})...")
 
-    queries = [
-        f'site:instagram.com "{nicho}" {pais}',
-        f'site:instagram.com "{nicho}" influencer {pais}',
-        f'instagram "{nicho}" {pais} cuenta "@"',
-        f'instagram "{nicho}" viral reels {pais}',
-    ]
+    if pais == "_en":
+        queries = [
+            f'site:instagram.com "{nicho}" bodybuilder',
+            f'site:instagram.com "{nicho}" english influencer',
+            f'instagram "{nicho}" english creator "@"',
+            f'instagram "{nicho}" viral reels english',
+            f'top {nicho} instagram accounts english',
+        ]
+    else:
+        queries = [
+            f'site:instagram.com "{nicho}" {pais}',
+            f'site:instagram.com "{nicho}" influencer {pais}',
+            f'instagram "{nicho}" {pais} cuenta "@"',
+            f'instagram "{nicho}" viral reels {pais}',
+        ]
 
     usernames = set()
     with DDGS() as ddgs:
@@ -72,10 +111,14 @@ def buscar_usernames(nicho: str, pais: str, cantidad: int) -> list[str]:
     return list(usernames)[:cantidad * 4]
 
 
-def obtener_metricas(username: str, loader: instaloader.Instaloader) -> CuentaInstagram | None:
+def obtener_metricas(username: str, loader: instaloader.Instaloader, solo_ingles: bool = False) -> CuentaInstagram | None:
     """Obtiene métricas de un perfil público de Instagram."""
     try:
         profile = instaloader.Profile.from_username(loader.context, username)
+
+        if solo_ingles and not es_ingles(profile):
+            print(f"  ⏭  @{username} descartada (no publica en inglés)")
+            return None
 
         total_interacciones = 0
         total_views = 0
@@ -145,7 +188,7 @@ def clasificar_ratio(ratio: float) -> str:
 def main():
     parser = argparse.ArgumentParser(description="Busca cuentas de Instagram por nicho con métricas de alcance y engagement")
     parser.add_argument("--nicho", required=True, help="Nicho a buscar (ej: culturismo, fitness, yoga)")
-    parser.add_argument("--pais", default="España", help="País de búsqueda (default: España)")
+    parser.add_argument("--pais", default="España", help="País de búsqueda (default: España). Usa 'en' para buscar cuentas en inglés de cualquier país.")
     parser.add_argument("--cantidad", type=int, default=10, help="Número de cuentas a analizar (default: 10)")
     parser.add_argument("--modo", default="engagement", choices=["engagement", "viral"],
                         help="Ordenar por engagement o por ratio views/seguidores (default: engagement)")
@@ -165,13 +208,16 @@ def main():
         print(f"🔑 Iniciando sesión como @{args.usuario}...")
         loader.login(args.usuario, args.password)
 
-    usernames = buscar_usernames(args.nicho, args.pais, args.cantidad)
+    solo_ingles = args.pais.lower() in ("en", "english", "inglés", "ingles")
+    pais_busqueda = "_en" if solo_ingles else args.pais
+
+    usernames = buscar_usernames(args.nicho, pais_busqueda, args.cantidad)
 
     if not usernames:
         print("❌ No se encontraron cuentas. Intenta con otro nicho o país.")
         sys.exit(1)
 
-    print(f"\n📊 Analizando {min(len(usernames), args.cantidad)} cuentas...\n")
+    print(f"\n📊 Analizando cuentas... (filtrando por +100K seguidores{', idioma inglés' if solo_ingles else ''})\n")
 
     cuentas = []
     analizadas = 0
@@ -179,7 +225,7 @@ def main():
     for username in usernames:
         if analizadas >= args.cantidad:
             break
-        cuenta = obtener_metricas(username, loader)
+        cuenta = obtener_metricas(username, loader, solo_ingles=solo_ingles)
         if cuenta and cuenta.seguidores >= 100_000:
             cuentas.append(cuenta)
             analizadas += 1
