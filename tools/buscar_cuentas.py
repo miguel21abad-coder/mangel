@@ -27,12 +27,19 @@ except ImportError:
     subprocess.check_call([sys.executable, "-m", "pip", "install", "instaloader", "-q"])
     import instaloader
 
-try:
-    from langdetect import detect as detect_lang
-except ImportError:
-    import subprocess
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "langdetect", "-q"])
-    from langdetect import detect as detect_lang
+PALABRAS_EN = {
+    "the", "and", "for", "with", "your", "you", "this", "that", "from",
+    "are", "was", "have", "has", "been", "will", "not", "but", "they",
+    "his", "her", "our", "more", "all", "about", "just", "can", "get",
+    "my", "me", "we", "at", "be", "to", "of", "in", "is", "it", "on",
+    "workout", "training", "gains", "gym", "fitness", "coach", "athlete",
+    "follow", "link", "bio", "shop", "online", "weight", "muscle", "diet",
+}
+PALABRAS_ES = {
+    "de", "la", "el", "en", "que", "los", "las", "con", "por", "para",
+    "del", "una", "uno", "es", "se", "mi", "tu", "su", "no", "si",
+    "entreno", "entrenamiento", "fuerza", "culturismo", "dieta", "nutrición",
+}
 
 
 def es_ingles(profile: "instaloader.Profile") -> bool:
@@ -43,18 +50,18 @@ def es_ingles(profile: "instaloader.Profile") -> bool:
             if i >= 5:
                 break
             if post.caption:
-                textos.append(post.caption[:200])
+                textos.append(post.caption[:300])
             time.sleep(0.2)
     except Exception:
         pass
 
-    texto_total = " ".join(textos).strip()
-    if not texto_total:
+    palabras = re.findall(r"[a-záéíóúüñ]+", " ".join(textos).lower())
+    if not palabras:
         return False
-    try:
-        return detect_lang(texto_total) == "en"
-    except Exception:
-        return False
+
+    hits_en = sum(1 for p in palabras if p in PALABRAS_EN)
+    hits_es = sum(1 for p in palabras if p in PALABRAS_ES)
+    return hits_en > hits_es
 
 
 @dataclass
