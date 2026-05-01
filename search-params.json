@@ -1,6 +1,1 @@
-{
-  "nicho": "bodybuilding",
-  "pais": "en",
-  "cantidad": 15,
-  "modo": "viral"
-}
+{\n  \"nicho\": \"bodybuilding\",\n  \"pais\": \"en\",\n  \"cantidad\": 15,\n  \"modo\": \"viral\",\n  \"run\": 2\n}\n
