@@ -25,7 +25,7 @@ except ImportError:
     import requests
 
 
-APIFY_BASE = "https://api.apify.com/v2"
+APAFY_BASE = "https://api.apify.com/v2"
 
 
 @dataclass
@@ -66,7 +66,7 @@ def buscar_usernames_apify(nicho: str, pais: str, cantidad: int, token: str) -> 
     }
 
     try:
-        items = apify_run("apify/instagram-hashtag-scraper", run_input, token, timeout=180)
+        items = apify_run("apify~instagram-hashtag-scraper", run_input, token, timeout=180)
     except Exception as e:
         print(f"  ⚠️  Error buscando hashtags: {e}")
         return []
@@ -91,7 +91,7 @@ def obtener_perfiles_apify(usernames: list[str], token: str) -> list[dict]:
     }
 
     try:
-        return apify_run("apify/instagram-profile-scraper", run_input, token, timeout=300)
+        return apify_run("apify~instagram-profile-scraper", run_input, token, timeout=300)
     except Exception as e:
         print(f"  ⚠️  Error obteniendo perfiles: {e}")
         return []
@@ -213,8 +213,7 @@ def main():
             if not cuenta:
                 continue
             if solo_ingles:
-                texto = cuenta.bio
-                if not es_ingles(texto):
+                if not es_ingles(cuenta.bio):
                     print(f"  ⏭  @{cuenta.username} descartada (no publica en inglés)")
                     continue
             cuentas.append(cuenta)
